@@ -780,7 +780,7 @@ void main() {
 •⁠  ⁠সকল এরর মেসেজ ইংরেজিতে থাকবে</li>
 </ol>
 
-<h1>Faiyaz Karim Annoor (69) <img width="256" height="256" alt="image" src="https://github.com/user-attachments/assets/3cc6576e-ef37-442b-bfae-553a2740de81" />
+<h1>Faiyaz Karim Annoor (69) <img width="56" height="56" alt="image" src="https://github.com/user-attachments/assets/3cc6576e-ef37-442b-bfae-553a2740de81" />
 </h1>
 
 <ol>
