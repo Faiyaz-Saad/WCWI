@@ -778,9 +778,10 @@ void main() {
 •⁠  ⁠UI ডিজাইন এবং ডেটা স্টোরেজ অন্য ডেভেলপাররা করবে
 •⁠  ⁠আপনাকে UI ডেভেলপার এবং ডেটা স্টোরেজ ডেভেলপারের সাথে কোড ইন্টিগ্রেট করতে হবে
 •⁠  ⁠সকল এরর মেসেজ ইংরেজিতে থাকবে</li>
-<li></li>
 </ol>
-<h1>Faiyaz Karim Annoor (69) </h1>
+
+<h1>Faiyaz Karim Annoor (69) <img width="256" height="256" alt="image" src="https://github.com/user-attachments/assets/3cc6576e-ef37-442b-bfae-553a2740de81" />
+</h1>
 
 <ol>
   <li># ডেভেলপার ১: UI/UX এবং ফ্রন্টএন্ড ডেভেলপমেন্ট প্রম্পট
