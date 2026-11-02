@@ -780,6 +780,11 @@ void main() {
 •⁠  ⁠সকল এরর মেসেজ ইংরেজিতে থাকবে</li>
 </ol>
 
+<h2>Problems ❌</h2>
+<ul>
+  <li>how  to  test whether the app is running in wifi mode or not</li>
+</ul>
+
 <h1>⭐ Faiyaz Karim Annoor (69) <img width="56" height="56" alt="image" src="https://github.com/user-attachments/assets/3cc6576e-ef37-442b-bfae-553a2740de81" /> <i><b>UI</b></i></h1>
 
 <ol>
