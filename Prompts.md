@@ -1334,6 +1334,11 @@ lib/
 </li>
 </ol>
 
+<h2>Problems</h2>
+<ul>
+  <li>header and footer remove koran</li>
+</ul>
+
 <h1>⭐ Pranto Roy (70) 🗄️ <i><b>Storage</b></i></h1>
 
 <ol>
