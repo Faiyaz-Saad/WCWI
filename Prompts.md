@@ -1,4 +1,4 @@
-<h1>A S M Hossain Mahmmud Shadhin (68)  🛜<i><b>Networking</b></i></h1> 
+<h1>⭐ A S M Hossain Mahmmud Shadhin (68)  🛜<i><b>Networking</b></i></h1> 
 
 <ol>
   <li>এই অ্যাপ্লিকেশনের সকল ইউজার ইন্টারফেস (UI) টেক্সট, লেবেল, মেসেজ, বাটন, মেনু এবং অন্যান্য সকল দৃশ্যমান উপাদান শুধুমাত্র ইংরেজিতে থাকবে। অ্যাপের মধ্যে কোনো বাংলা ভাষার টেক্সট ব্যবহার করা যাবে না।
@@ -780,8 +780,7 @@ void main() {
 •⁠  ⁠সকল এরর মেসেজ ইংরেজিতে থাকবে</li>
 </ol>
 
-<h1>Faiyaz Karim Annoor (69) <img width="56" height="56" alt="image" src="https://github.com/user-attachments/assets/3cc6576e-ef37-442b-bfae-553a2740de81" />
-</h1>
+<h1>⭐ Faiyaz Karim Annoor (69) <img width="56" height="56" alt="image" src="https://github.com/user-attachments/assets/3cc6576e-ef37-442b-bfae-553a2740de81" /> <i><b>UI</b></i></h1>
 
 <ol>
   <li># ডেভেলপার ১: UI/UX এবং ফ্রন্টএন্ড ডেভেলপমেন্ট প্রম্পট
@@ -1334,7 +1333,8 @@ lib/
 - সকল UI টেক্সট ইংরেজিতে থাকবে
 </li>
 </ol>
-<h1>Pranto Roy (70)</h1>
+
+<h1>⭐ Pranto Roy (70) 🗄️ <i><b>Storage</b></i></h1>
 
 <ol>
   <li></li>
