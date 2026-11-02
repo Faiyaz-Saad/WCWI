@@ -1337,6 +1337,7 @@ lib/
 <h2>Problems ❌</h2>
 <ul>
   <li>header and footer remove koran</li>
+  <li>WiFi mode page a WiFi Mode ar pori borta ata add koran</li>
 </ul>
 
 <h1>⭐ Pranto Roy (70) 🗄️ <i><b>Storage</b></i></h1>
