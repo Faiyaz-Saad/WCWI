@@ -1348,5 +1348,985 @@ lib/
 <h1>⭐ Pranto Roy (70) 🗄️ <i><b>Storage</b></i></h1>
 
 <ol>
-  <li></li>
+  <li># ডেভেলপার ৩: ডেটা স্টোরেজ এবং চ্যাট হিস্টরি ম্যানেজমেন্ট প্রম্পট
+
+## গুরুত্বপূর্ণ নোট
+
+এই অ্যাপ্লিকেশনের সকল ইউজার ইন্টারফেস (UI) টেক্সট, লেবেল, মেসেজ, বাটন, মেনু এবং অন্যান্য সকল দৃশ্যমান উপাদান শুধুমাত্র ইংরেজিতে থাকবে। অ্যাপের মধ্যে কোনো বাংলা ভাষার টেক্সট ব্যবহার করা যাবে না।
+
+---
+
+## ডেভেলপারের দায়িত্ব
+
+আপনার দায়িত্ব হলো WCWI (Wireless Communication Without Internet) অ্যাপের সম্পূর্ণ ডেটা স্টোরেজ সিস্টেম, চ্যাট হিস্টরি ম্যানেজমেন্ট, ফাইল স্টোরেজ (ছবি এবং ভয়েস মেসেজ) এবং ডেটা পার্সিস্টেন্স ডেভেলপ করা। আপনাকে স্থানীয় ডেটাবেস এবং ফাইল সিস্টেম ব্যবহার করে সকল ডেটা সংরক্ষণ করতে হবে।
+
+---
+
+## ১. টেকনোলজি স্ট্যাক
+
+- *ফ্রেমওয়ার্ক:* Flutter
+- *ভাষা:* Dart
+- *ডেটাবেস:* SQLite (sqflite প্যাকেজ) বা Hive (NoSQL)
+- *ফাইল স্টোরেজ:* path_provider প্যাকেজ
+- *ইমেজ প্রসেসিং:* image_picker প্যাকেজ
+- *ভয়েস রেকর্ডিং:* record বা audioplayers প্যাকেজ
+- *স্টেট ম্যানেজমেন্ট:* Provider বা Riverpod
+
+---
+
+## ২. ডেটা স্টোরেজ আর্কিটেকচার
+
+### ২.১. ডেটাবেস স্কিমা
+
+*টেবিল ১: Chats (চ্যাট সেশন)*
+sql
+CREATE TABLE chats (
+  id TEXT PRIMARY KEY,
+  device_name TEXT NOT NULL,
+  connection_type TEXT NOT NULL, -- 'wifi' or 'bluetooth'
+  last_message TEXT,
+  last_message_time INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+
+*টেবিল ২: Messages (মেসেজ)*
+sql
+CREATE TABLE messages (
+  id TEXT PRIMARY KEY,
+  chat_id TEXT NOT NULL,
+  content TEXT NOT NULL,
+  message_type TEXT NOT NULL, -- 'text', 'image', 'voice'
+  direction TEXT NOT NULL, -- 'sent' or 'received'
+  file_path TEXT,
+  timestamp INTEGER NOT NULL,
+  is_deleted INTEGER DEFAULT 0,
+  FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
+);
+
+
+### ২.২. ফাইল স্টোরেজ স্ট্রাকচার
+
+
+app_data/
+├── images/
+│   ├── chat_1/
+│   │   ├── msg_1.jpg
+│   │   └── msg_2.jpg
+│   └── chat_2/
+│       └── msg_1.jpg
+└── voice/
+    ├── chat_1/
+    │   ├── msg_1.mp3
+    │   └── msg_2.mp3
+    └── chat_2/
+        └── msg_1.mp3
+
+
+### ২.৩. কম্পোনেন্ট স্ট্রাকচার
+
+
+lib/
+├── services/
+│   ├── database_service.dart
+│   ├── chat_service.dart
+│   ├── message_service.dart
+│   ├── file_storage_service.dart
+│   └── image_service.dart
+├── models/
+│   ├── chat.dart
+│   ├── message.dart
+│   └── file_info.dart
+└── repositories/
+    ├── chat_repository.dart
+    └── message_repository.dart
+
+
+---
+
+## ৩. ডেটাবেস সার্ভিস
+
+### ৩.১. ডেটাবেস সার্ভিস ইমপ্লিমেন্টেশন
+
+*ফাইল নাম:* database_service.dart
+
+dart
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
+
+class DatabaseService {
+  static final DatabaseService _instance = DatabaseService._internal();
+  static Database? _database;
+  
+  factory DatabaseService() => _instance;
+  DatabaseService._internal();
+  
+  // ডেটাবেস ইনিশিয়ালাইজ করা
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    
+    _database = await _initDatabase();
+    return _database!;
+  }
+  
+  // ডেটাবেস তৈরি করা
+  Future<Database> _initDatabase() async {
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, 'wcwi.db');
+    
+    return await openDatabase(
+      path,
+      version: 1,
+      onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
+    );
+  }
+  
+  // টেবিল তৈরি করা
+  Future<void> _onCreate(Database db, int version) async {
+    // Chats টেবিল
+    await db.execute('''
+      CREATE TABLE chats (
+        id TEXT PRIMARY KEY,
+        device_name TEXT NOT NULL,
+        connection_type TEXT NOT NULL,
+        last_message TEXT,
+        last_message_time INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+    
+    // Messages টেবিল
+    await db.execute('''
+      CREATE TABLE messages (
+        id TEXT PRIMARY KEY,
+        chat_id TEXT NOT NULL,
+        content TEXT NOT NULL,
+        message_type TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        file_path TEXT,
+        timestamp INTEGER NOT NULL,
+        is_deleted INTEGER DEFAULT 0,
+        FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
+      )
+    ''');
+    
+    // ইনডেক্স তৈরি করা
+    await db.execute('CREATE INDEX idx_messages_chat_id ON messages(chat_id)');
+    await db.execute('CREATE INDEX idx_messages_timestamp ON messages(timestamp)');
+  }
+  
+  // ডেটাবেস আপগ্রেড
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    // ভবিষ্যতে আপগ্রেড লজিক এখানে যোগ করা হবে
+  }
+  
+  // ডেটাবেস বন্ধ করা
+  Future<void> close() async {
+    final db = await database;
+    await db.close();
+  }
+}
+
+
+---
+
+## ৪. চ্যাট মডেল এবং সার্ভিস
+
+### ৪.১. চ্যাট মডেল
+
+*ফাইল নাম:* chat.dart
+
+dart
+class Chat {
+  final String id;
+  final String deviceName;
+  final String connectionType;
+  final String? lastMessage;
+  final int? lastMessageTime;
+  final int createdAt;
+  final int updatedAt;
+  
+  Chat({
+    required this.id,
+    required this.deviceName,
+    required this.connectionType,
+    this.lastMessage,
+    this.lastMessageTime,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  
+  // ডেটাবেস থেকে Chat তৈরি করা
+  factory Chat.fromMap(Map<String, dynamic> map) {
+    return Chat(
+      id: map['id'],
+      deviceName: map['device_name'],
+      connectionType: map['connection_type'],
+      lastMessage: map['last_message'],
+      lastMessageTime: map['last_message_time'],
+      createdAt: map['created_at'],
+      updatedAt: map['updated_at'],
+    );
+  }
+  
+  // Chat থেকে Map তৈরি করা
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'device_name': deviceName,
+      'connection_type': connectionType,
+      'last_message': lastMessage,
+      'last_message_time': lastMessageTime,
+      'created_at': createdAt,
+      'updated_at': updatedAt,
+    };
+  }
+}
+
+
+### ৪.২. চ্যাট সার্ভিস
+
+*ফাইল নাম:* chat_service.dart
+
+dart
+import 'package:uuid/uuid.dart';
+
+class ChatService {
+  final DatabaseService _dbService;
+  
+  ChatService({required DatabaseService dbService}) 
+      : _dbService = dbService;
+  
+  // নতুন চ্যাট তৈরি করা
+  Future<Chat> createChat({
+    required String deviceName,
+    required String connectionType,
+  }) async {
+    final db = await _dbService.database;
+    final chatId = const Uuid().v4();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    
+    final chat = Chat(
+      id: chatId,
+      deviceName: deviceName,
+      connectionType: connectionType,
+      createdAt: now,
+      updatedAt: now,
+    );
+    
+    await db.insert('chats', chat.toMap());
+    return chat;
+  }
+  
+  // সকল চ্যাট পাওয়া
+  Future<List<Chat>> getAllChats() async {
+    final db = await _dbService.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'chats',
+      orderBy: 'updated_at DESC',
+    );
+    
+    return maps.map((map) => Chat.fromMap(map)).toList();
+  }
+  
+  // নির্দিষ্ট চ্যাট পাওয়া
+  Future<Chat?> getChatById(String chatId) async {
+    final db = await _dbService.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'chats',
+      where: 'id = ?',
+      whereArgs: [chatId],
+    );
+    
+    if (maps.isEmpty) return null;
+    return Chat.fromMap(maps.first);
+  }
+  
+  // চ্যাট আপডেট করা
+  Future<void> updateChat(Chat chat) async {
+    final db = await _dbService.database;
+    final updatedChat = Chat(
+      id: chat.id,
+      deviceName: chat.deviceName,
+      connectionType: chat.connectionType,
+      lastMessage: chat.lastMessage,
+      lastMessageTime: chat.lastMessageTime,
+      createdAt: chat.createdAt,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    
+    await db.update(
+      'chats',
+      updatedChat.toMap(),
+      where: 'id = ?',
+      whereArgs: [chat.id],
+    );
+  }
+  
+  // চ্যাট ডিলিট করা
+  Future<void> deleteChat(String chatId) async {
+    final db = await _dbService.database;
+    await db.delete(
+      'chats',
+      where: 'id = ?',
+      whereArgs: [chatId],
+    );
+  }
+  
+  // সকল চ্যাট ডিলিট করা
+  Future<void> deleteAllChats() async {
+    final db = await _dbService.database;
+    await db.delete('chats');
+  }
+}
+
+
+---
+
+## ৫. মেসেজ মডেল এবং সার্ভিস
+
+### ৫.১. মেসেজ মডেল
+
+*ফাইল নাম:* message.dart
+
+dart
+class Message {
+  final String id;
+  final String chatId;
+  final String content;
+  final String messageType; // 'text', 'image', 'voice'
+  final String direction; // 'sent' or 'received'
+  final String? filePath;
+  final int timestamp;
+  final bool isDeleted;
+  
+  Message({
+    required this.id,
+    required this.chatId,
+    required this.content,
+    required this.messageType,
+    required this.direction,
+    this.filePath,
+    required this.timestamp,
+    this.isDeleted = false,
+  });
+  
+  // ডেটাবেস থেকে Message তৈরি করা
+  factory Message.fromMap(Map<String, dynamic> map) {
+    return Message(
+      id: map['id'],
+      chatId: map['chat_id'],
+      content: map['content'],
+      messageType: map['message_type'],
+      direction: map['direction'],
+      filePath: map['file_path'],
+      timestamp: map['timestamp'],
+      isDeleted: map['is_deleted'] == 1,
+    );
+  }
+  
+  // Message থেকে Map তৈরি করা
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'chat_id': chatId,
+      'content': content,
+      'message_type': messageType,
+      'direction': direction,
+      'file_path': filePath,
+      'timestamp': timestamp,
+      'is_deleted': isDeleted ? 1 : 0,
+    };
+  }
+  
+  // DateTime থেকে timestamp
+  static int toDateTime(DateTime dateTime) {
+    return dateTime.millisecondsSinceEpoch;
+  }
+  
+  // timestamp থেকে DateTime
+  static DateTime fromTimestamp(int timestamp) {
+    return DateTime.fromMillisecondsSinceEpoch(timestamp);
+  }
+}
+
+
+### ৫.২. মেসেজ সার্ভিস
+
+*ফাইল নাম:* message_service.dart
+
+dart
+import 'package:uuid/uuid.dart';
+
+class MessageService {
+  final DatabaseService _dbService;
+  final ChatService _chatService;
+  
+  MessageService({
+    required DatabaseService dbService,
+    required ChatService chatService,
+  }) : _dbService = dbService,
+       _chatService = chatService;
+  
+  // নতুন মেসেজ তৈরি করা
+  Future<Message> createMessage({
+    required String chatId,
+    required String content,
+    required String messageType,
+    required String direction,
+    String? filePath,
+  }) async {
+    final db = await _dbService.database;
+    final messageId = const Uuid().v4();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    
+    final message = Message(
+      id: messageId,
+      chatId: chatId,
+      content: content,
+      messageType: messageType,
+      direction: direction,
+      filePath: filePath,
+      timestamp: now,
+    );
+    
+    await db.insert('messages', message.toMap());
+    
+    // চ্যাট আপডেট করা
+    final chat = await _chatService.getChatById(chatId);
+    if (chat != null) {
+      await _chatService.updateChat(Chat(
+        id: chat.id,
+        deviceName: chat.deviceName,
+        connectionType: chat.connectionType,
+        lastMessage: content,
+        lastMessageTime: now,
+        createdAt: chat.createdAt,
+        updatedAt: now,
+      ));
+    }
+    
+    return message;
+  }
+  
+  // নির্দিষ্ট চ্যাটের সকল মেসেজ পাওয়া
+  Future<List<Message>> getMessagesByChatId(String chatId) async {
+    final db = await _dbService.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'messages',
+      where: 'chat_id = ? AND is_deleted = 0',
+      whereArgs: [chatId],
+      orderBy: 'timestamp ASC',
+    );
+    
+    return maps.map((map) => Message.fromMap(map)).toList();
+  }
+  
+  // নির্দিষ্ট মেসেজ পাওয়া
+  Future<Message?> getMessageById(String messageId) async {
+    final db = await _dbService.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'messages',
+      where: 'id = ?',
+      whereArgs: [messageId],
+    );
+    
+    if (maps.isEmpty) return null;
+    return Message.fromMap(maps.first);
+  }
+  
+  // মেসেজ ডিলিট করা (soft delete)
+  Future<void> deleteMessage(String messageId) async {
+    final db = await _dbService.database;
+    await db.update(
+      'messages',
+      {'is_deleted': 1},
+      where: 'id = ?',
+      whereArgs: [messageId],
+    );
+  }
+  
+  // চ্যাটের সকল মেসেজ ডিলিট করা
+  Future<void> deleteAllMessagesByChatId(String chatId) async {
+    final db = await _dbService.database;
+    await db.update(
+      'messages',
+      {'is_deleted': 1},
+      where: 'chat_id = ?',
+      whereArgs: [chatId],
+    );
+  }
+  
+  // মেসেজ সিলেক্ট করা
+  Future<void> selectMessage(String messageId, bool isSelected) async {
+    // UI এর জন্য সিলেকশন স্টেট ম্যানেজ করতে হবে
+    // এটি Provider বা Riverpod এর মাধ্যমে করা যেতে পারে
+  }
+  
+  // সকল মেসেজ সিলেক্ট করা
+  Future<void> selectAllMessages(String chatId, bool isSelected) async {
+    // UI এর জন্য সিলেকশন স্টেট ম্যানেজ করতে হবে
+  }
+}
+
+
+---
+
+## ৬. ফাইল স্টোরেজ সার্ভিস
+
+### ৬.১. ফাইল স্টোরেজ সার্ভিস
+
+*ফাইল নাম:* file_storage_service.dart
+
+dart
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+
+class FileStorageService {
+  // অ্যাপ ডিরেক্টরি পাওয়া
+  Future<Directory> getAppDirectory() async {
+    final directory = await getApplicationDocumentsDirectory();
+    return directory;
+  }
+  
+  // ইমেজ ডিরেক্টরি পাওয়া
+  Future<Directory> getImageDirectory(String chatId) async {
+    final appDir = await getAppDirectory();
+    final imageDir = Directory('${appDir.path}/images/$chatId');
+    
+    if (!await imageDir.exists()) {
+      await imageDir.create(recursive: true);
+    }
+    
+    return imageDir;
+  }
+  
+  // ভয়েস ডিরেক্টরি পাওয়া
+  Future<Directory> getVoiceDirectory(String chatId) async {
+    final appDir = await getAppDirectory();
+    final voiceDir = Directory('${appDir.path}/voice/$chatId');
+    
+    if (!await voiceDir.exists()) {
+      await voiceDir.create(recursive: true);
+    }
+    
+    return voiceDir;
+  }
+  
+  // ফাইল সেভ করা
+  Future<File> saveFile(File sourceFile, Directory targetDirectory) async {
+    final fileName = sourceFile.path.split('/').last;
+    final targetPath = '${targetDirectory.path}/$fileName';
+    final targetFile = await sourceFile.copy(targetPath);
+    return targetFile;
+  }
+  
+  // ফাইল ডিলিট করা
+  Future<void> deleteFile(String filePath) async {
+    final file = File(filePath);
+    if (await file.exists()) {
+      await file.delete();
+    }
+  }
+  
+  // চ্যাটের সকল ফাইল ডিলিট করা
+  Future<void> deleteChatFiles(String chatId) async {
+    final imageDir = await getImageDirectory(chatId);
+    final voiceDir = await getVoiceDirectory(chatId);
+    
+    if (await imageDir.exists()) {
+      await imageDir.delete(recursive: true);
+    }
+    
+    if (await voiceDir.exists()) {
+      await voiceDir.delete(recursive: true);
+    }
+  }
+  
+  // ফাইলের সাইজ পাওয়া
+  Future<int> getFileSize(String filePath) async {
+    final file = File(filePath);
+    if (await file.exists()) {
+      return await file.length();
+    }
+    return 0;
+  }
+}
+
+
+---
+
+## ৭. ইমেজ সার্ভিস
+
+### ৭.১. ইমেজ সার্ভিস
+
+*ফাইল নাম:* image_service.dart
+
+dart
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:uuid/uuid.dart';
+import 'file_storage_service.dart';
+
+class ImageService {
+  final FileStorageService _fileStorageService;
+  final ImagePicker _imagePicker = ImagePicker();
+  
+  ImageService({required FileStorageService fileStorageService})
+      : _fileStorageService = fileStorageService;
+  
+  // গ্যালারি থেকে ইমেজ পিক করা
+  Future<File?> pickImageFromGallery() async {
+    final XFile? image = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+    
+    if (image != null) {
+      return File(image.path);
+    }
+    return null;
+  }
+  
+  // ক্যামেরা থেকে ইমেজ পিক করা
+  Future<File?> pickImageFromCamera() async {
+    final XFile? image = await _imagePicker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 80,
+    );
+    
+    if (image != null) {
+      return File(image.path);
+    }
+    return null;
+  }
+  
+  // ইমেজ সেভ করা
+  Future<String> saveImage(File imageFile, String chatId) async {
+    final imageDir = await _fileStorageService.getImageDirectory(chatId);
+    final savedFile = await _fileStorageService.saveFile(imageFile, imageDir);
+    return savedFile.path;
+  }
+  
+  // ইমেজ কমপ্রেস করা
+  Future<File> compressImage(File imageFile) async {
+    // ইমেজ কমপ্রেশন লজিক
+    // image প্যাকেজ ব্যবহার করে কমপ্রেশন করা যেতে পারে
+    return imageFile;
+  }
+  
+  // ইমেজ ডিলিট করা
+  Future<void> deleteImage(String imagePath) async {
+    await _fileStorageService.deleteFile(imagePath);
+  }
+}
+
+
+---
+
+## ৮. ভয়েস রেকর্ডিং সার্ভিস
+
+### ৮.১. ভয়েস সার্ভিস
+
+*ফাইল নাম:* voice_service.dart
+
+dart
+import 'package:record/record.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+import 'package:uuid/uuid.dart';
+import 'file_storage_service.dart';
+
+class VoiceService {
+  final FileStorageService _fileStorageService;
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  
+  VoiceService({required FileStorageService fileStorageService})
+      : _fileStorageService = fileStorageService;
+  
+  bool _isRecording = false;
+  String? _currentRecordingPath;
+  
+  // রেকর্ডিং শুরু করা
+  Future<String> startRecording(String chatId) async {
+    if (_isRecording) return _currentRecordingPath!;
+    
+    final voiceDir = await _fileStorageService.getVoiceDirectory(chatId);
+    final fileName = '${const Uuid().v4()}.mp3';
+    final filePath = '${voiceDir.path}/$fileName';
+    
+    await _audioRecorder.startRecorder(
+      toFile: filePath,
+      encoder: AudioEncoder.aacLc,
+    );
+    
+    _isRecording = true;
+    _currentRecordingPath = filePath;
+    
+    return filePath;
+  }
+  
+  // রেকর্ডিং বন্ধ করা
+  Future<String?> stopRecording() async {
+    if (!_isRecording) return null;
+    
+    final path = await _audioRecorder.stopRecorder();
+    _isRecording = false;
+    _currentRecordingPath = null;
+    
+    return path;
+  }
+  
+  // রেকর্ডিং চলছে কি না
+  bool get isRecording => _isRecording;
+  
+  // ভয়েস ফাইল ডিলিট করা
+  Future<void> deleteVoice(String voicePath) async {
+    await _fileStorageService.deleteFile(voicePath);
+  }
+  
+  // ভয়েস ফাইলের সময়কাল পাওয়া
+  Future<Duration?> getVoiceDuration(String voicePath) async {
+    // audioplayers প্যাকেজ ব্যবহার করে সময়কাল পাওয়া যেতে পারে
+    return Duration(seconds: 0);
+  }
+}
+
+
+---
+
+## ৯. রিপোজিটরি প্যাটার্ন
+
+### ৯.১. চ্যাট রিপোজিটরি
+
+*ফাইল নাম:* chat_repository.dart
+
+dart
+class ChatRepository {
+  final ChatService _chatService;
+  final MessageService _messageService;
+  
+  ChatRepository({
+    required ChatService chatService,
+    required MessageService messageService,
+  }) : _chatService = chatService,
+       _messageService = messageService;
+  
+  // চ্যাট তৈরি করা
+  Future<Chat> createChat({
+    required String deviceName,
+    required String connectionType,
+  }) async {
+    return await _chatService.createChat(
+      deviceName: deviceName,
+      connectionType: connectionType,
+    );
+  }
+  
+  // সকল চ্যাট পাওয়া
+  Future<List<Chat>> getAllChats() async {
+    return await _chatService.getAllChats();
+  }
+  
+  // চ্যাট ডিলিট করা
+  Future<void> deleteChat(String chatId) async {
+    await _messageService.deleteAllMessagesByChatId(chatId);
+    await _chatService.deleteChat(chatId);
+  }
+}
+
+
+### ৯.২. মেসেজ রিপোজিটরি
+
+*ফাইল নাম:* message_repository.dart
+
+dart
+class MessageRepository {
+  final MessageService _messageService;
+  final ImageService _imageService;
+  final VoiceService _voiceService;
+  
+  MessageRepository({
+    required MessageService messageService,
+    required ImageService imageService,
+    required VoiceService voiceService,
+  }) : _messageService = messageService,
+       _imageService = imageService,
+       _voiceService = voiceService;
+  
+  // টেক্সট মেসেজ পাঠানো
+  Future<Message> sendTextMessage({
+    required String chatId,
+    required String content,
+    required String direction,
+  }) async {
+    return await _messageService.createMessage(
+      chatId: chatId,
+      content: content,
+      messageType: 'text',
+      direction: direction,
+    );
+  }
+  
+  // ছবি মেসেজ পাঠানো
+  Future<Message> sendImageMessage({
+    required String chatId,
+    required File imageFile,
+    required String direction,
+  }) async {
+    final imagePath = await _imageService.saveImage(imageFile, chatId);
+    
+    return await _messageService.createMessage(
+      chatId: chatId,
+      content: 'Image',
+      messageType: 'image',
+      direction: direction,
+      filePath: imagePath,
+    );
+  }
+  
+  // ভয়েস মেসেজ পাঠানো
+  Future<Message> sendVoiceMessage({
+    required String chatId,
+    required String voicePath,
+    required String direction,
+  }) async {
+    return await _messageService.createMessage(
+      chatId: chatId,
+      content: 'Voice',
+      messageType: 'voice',
+      direction: direction,
+      filePath: voicePath,
+    );
+  }
+  
+  // মেসেজ ডিলিট করা
+  Future<void> deleteMessage(String messageId) async {
+    final message = await _messageService.getMessageById(messageId);
+    if (message != null && message.filePath != null) {
+      if (message.messageType == 'image') {
+        await _imageService.deleteImage(message.filePath!);
+      } else if (message.messageType == 'voice') {
+        await _voiceService.deleteVoice(message.filePath!);
+      }
+    }
+    await _messageService.deleteMessage(messageId);
+  }
+}
+
+
+---
+
+## ১০. ডেটা মাইগ্রেশন এবং ব্যাকআপ
+
+### ১০.১. ডেটা ব্যাকআপ
+
+dart
+class BackupService {
+  final DatabaseService _dbService;
+  final FileStorageService _fileStorageService;
+  
+  BackupService({
+    required DatabaseService dbService,
+    required FileStorageService fileStorageService,
+  }) : _dbService = dbService,
+       _fileStorageService = fileStorageService;
+  
+  // ডেটাবেস ব্যাকআপ নেওয়া
+  Future<File> backupDatabase() async {
+    final db = await _dbService.database;
+    final dbPath = db.path;
+    final backupFile = File('${dbPath}.backup');
+    await File(dbPath).copy(backupFile.path);
+    return backupFile;
+  }
+  
+  // ফাইল ব্যাকআপ নেওয়া
+  Future<void> backupFiles(String targetDirectory) async {
+    final appDir = await _fileStorageService.getAppDirectory();
+    final targetDir = Directory(targetDirectory);
+    
+    if (await appDir.exists()) {
+      await _copyDirectory(appDir, targetDir);
+    }
+  }
+  
+  // ডিরেক্টরি কপি করা
+  Future<void> _copyDirectory(Directory source, Directory target) async {
+    // ডিরেক্টরি কপি লজিক
+  }
+}
+
+
+---
+
+## ১১. টেস্টিং
+
+### ১১.১. ডেটাবেস টেস্ট
+
+dart
+// test/database_service_test.dart
+void main() {
+  group('DatabaseService Tests', () {
+    test('should create database successfully', () async {
+      final service = DatabaseService();
+      final db = await service.database;
+      expect(db, isNotNull);
+    });
+    
+    test('should create chat successfully', () async {
+      final service = ChatService(dbService: DatabaseService());
+      final chat = await service.createChat(
+        deviceName: 'Test Device',
+        connectionType: 'wifi',
+      );
+      expect(chat.deviceName, 'Test Device');
+    });
+  });
+}
+
+
+---
+
+## ১২. ডেভেলপমেন্ট গাইডলাইন
+
+### ১২.১. কোডিং স্ট্যান্ডার্ড
+
+- ক্লিন এবং মডুলার কোড স্ট্রাকচার
+- প্রপার এরর হ্যান্ডলিং
+- অ্যাসিঙ্ক্রোনাস অপারেশনের জন্য async/await ব্যবহার
+- কমেন্ট এবং ডকুমেন্টেশন
+
+### ১২.২. পারফরম্যান্স অপ্টিমাইজেশন
+
+- ডেটাবেস কোয়েরি অপ্টিমাইজ করা
+- ইমেজ কমপ্রেশন ব্যবহার করা
+- ফাইল ক্যাশিং ব্যবহার করা
+- মেমোরি লিক প্রতিরোধ করা
+
+---
+
+## ১৩. ডেলিভারেবলস
+
+১. ডেটাবেস সার্ভিস ইমপ্লিমেন্টেশন
+২. চ্যাট সার্ভিস এবং মডেল
+৩. মেসেজ সার্ভিস এবং মডেল
+৪. ফাইল স্টোরেজ সার্ভিস
+৫. ইমেজ সার্ভিস
+৬. ভয়েস রেকর্ডিং সার্ভিস
+৭. রিপোজিটরি প্যাটার্ন ইমপ্লিমেন্টেশন
+৮. ডেটা ব্যাকআপ সার্ভিস
+৯. ডেটাবেস টেস্ট কোড
+
+---
+
+## ১৪. নোট
+
+- আপনাকে শুধুমাত্র ডেটা স্টোরেজ এবং চ্যাট হিস্টরি ম্যানেজমেন্ট ডেভেলপ করতে হবে
+- UI ডিজাইন এবং নেটওয়ার্কিং অন্য ডেভেলপাররা করবে
+- আপনাকে UI ডেভেলপার এবং নেটওয়ার্কিং ডেভেলপারের সাথে কোড ইন্টিগ্রেট করতে হবে
+- সকল এরর মেসেজ ইংরেজিতে থাকবে</li>
 </ol>
